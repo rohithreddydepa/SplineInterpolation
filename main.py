@@ -1,4 +1,5 @@
 import os
+import subprocess
 from src.audio.audio_utils import load_audio, save_audio
 from src.audio.audio_interpolation import interpolate_audio
 from src.video.video_utils import load_video_frames, save_video
@@ -19,8 +20,19 @@ audio_interpolation_factor = 2
 video_interpolation_factor = 3
 
 # Ensure output directories exist
+os.makedirs('data/input', exist_ok=True)
 os.makedirs('data/output', exist_ok=True)
 os.makedirs('results', exist_ok=True)
+
+print("========================================")
+print("Step 0: Running degrade.py to create low-quality input files...")
+try:
+    subprocess.run(["python", "degrade.py"], check=True)
+    print("Degradation completed successfully!")
+except subprocess.CalledProcessError as e:
+    print(f"Error occurred while running degrade.py: {e}")
+    exit(1)
+print("========================================")
 
 print("--- Starting Audio Enhancement ---")
 audio, sr = load_audio(input_audio_path)
