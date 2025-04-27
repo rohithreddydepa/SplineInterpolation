@@ -1,0 +1,16 @@
+name: spline-interpolation-enhancement
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy
+  - scipy
+  - scikit-learn
+  - scikit-image
+  - opencv
+  - matplotlib
+  - tqdm
+  - moviepy
+  - librosa
+  - pysoundfile

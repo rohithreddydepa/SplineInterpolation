@@ -1,0 +1,9 @@
+MSE: 0.0069
+MAE: 0.0632
+SNR: -3.1963
+PSNR: 20.8020
+Dynamic_Range_Original: 89.5006
+Dynamic_Range_Enhanced: 189.6424
+Spectral_Convergence: 0.0000
+Spectral_Centroid_Original: 434.1468
+Spectral_Centroid_Enhanced: 262.2390
