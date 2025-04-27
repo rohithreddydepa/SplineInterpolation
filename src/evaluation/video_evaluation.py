@@ -47,7 +47,8 @@ def evaluate_video(original_frames, enhanced_frames, output_folder="results/vide
             axes[1].axis('off')
 
             diff = cv2.absdiff(orig, enh)
-            axes[2].imshow(diff)
+            diff_color = cv2.applyColorMap(diff, cv2.COLORMAP_JET)
+            axes[2].imshow(diff_color)
             axes[2].set_title('Difference Map')
             axes[2].axis('off')
 
@@ -72,22 +73,34 @@ def evaluate_video(original_frames, enhanced_frames, output_folder="results/vide
         for c in ['y', 'u', 'v']:
             metrics['color_psnr'][c].append(res['color_psnr'][c])
 
+    # Plot Combined Metrics
     plt.figure(figsize=(14, 10))
 
+    # SSIM Plot
     plt.subplot(3, 1, 1)
-    plt.plot(metrics['ssim'], label='SSIM', color='blue')
+    plt.plot(range(len(metrics['ssim'])), metrics['ssim'], label='SSIM', color='blue')
     plt.title('SSIM over Frames')
+    plt.xlabel('Frame Index')
+    plt.ylabel('SSIM Value')
     plt.grid(True)
+    plt.legend()
 
+    # PSNR Plot
     plt.subplot(3, 1, 2)
-    plt.plot(metrics['psnr'], label='PSNR', color='green')
+    plt.plot(range(len(metrics['psnr'])), metrics['psnr'], label='PSNR', color='green')
     plt.title('PSNR over Frames')
+    plt.xlabel('Frame Index')
+    plt.ylabel('PSNR (dB)')
     plt.grid(True)
+    plt.legend()
 
+    # Color Channel PSNR Plot
     plt.subplot(3, 1, 3)
     for c, color in zip(['y', 'u', 'v'], ['gold', 'magenta', 'cyan']):
-        plt.plot(metrics['color_psnr'][c], label=f'{c.upper()} PSNR', color=color)
+        plt.plot(range(len(metrics['color_psnr'][c])), metrics['color_psnr'][c], label=f'{c.upper()} PSNR', color=color)
     plt.title('Color Channels PSNR')
+    plt.xlabel('Frame Index')
+    plt.ylabel('PSNR (dB)')
     plt.legend()
     plt.grid(True)
 
@@ -95,6 +108,31 @@ def evaluate_video(original_frames, enhanced_frames, output_folder="results/vide
     plt.savefig(os.path.join(output_folder, "video_quality_timeseries.png"))
     plt.close()
 
+    # Separate SSIM plot
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(len(metrics['ssim'])), metrics['ssim'], label='SSIM per Frame', color='blue')
+    plt.title('SSIM vs Frame Index')
+    plt.xlabel('Frame Index')
+    plt.ylabel('SSIM Value')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_folder, "ssim_per_frame.png"))
+    plt.close()
+
+    # Separate PSNR plot
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(len(metrics['psnr'])), metrics['psnr'], label='PSNR per Frame (dB)', color='green')
+    plt.title('PSNR vs Frame Index')
+    plt.xlabel('Frame Index')
+    plt.ylabel('PSNR (dB)')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_folder, "psnr_per_frame.png"))
+    plt.close()
+
+    # Summarize metrics
     summary = {
         'mean_ssim': np.mean(metrics['ssim']),
         'mean_psnr': np.mean(metrics['psnr']),
@@ -111,5 +149,5 @@ def evaluate_video(original_frames, enhanced_frames, output_folder="results/vide
     with open(os.path.join(output_folder, "video_metrics.json"), 'w') as f:
         json.dump({**metrics, **summary}, f, indent=2, default=convert_numpy)
 
-    print(f" Video evaluation completed. Results saved to {output_folder}")
+    print(f"✅ Video evaluation completed. Results saved to {output_folder}")
     return {**metrics, **summary}
