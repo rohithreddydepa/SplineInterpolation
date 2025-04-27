@@ -7,16 +7,6 @@ It reconstructs smoother frames and higher-quality audio from degraded inputs.
 
 ## 📂 Project Structure
 
-# Spline Interpolation Based Audio and Video Enhancement
-
-This project enhances degraded video and audio by using **spline interpolation** techniques.  
-The objective is to reconstruct smoother, high-quality frames and audio signals  
-from low frame-rate video and low sample-rate audio.
-
----
-
-## 📂 Project Structure
-
 ```plaintext
 / (Root Directory)
 ├── src/                  # Source code
@@ -36,12 +26,32 @@ from low frame-rate video and low sample-rate audio.
 ├── main.py                # Main script to run full enhancement pipeline
 └── README.md              # This file
 ```
-
 ---
 
 ## ⚙️ Setup Instructions
 
-### Option 1: Using Conda (Recommended)
+### Option 1: Using Docker (Recommended)
+
+Docker is the recommended way to run this project to avoid any dependency or environment issues.
+If Docker is not installed, please download and install it from [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/).
+
+1. Build the Docker image:
+
+```bash
+docker build -t spline-enhancement .
+```
+
+2. Run the Docker container:
+
+```bash
+docker run --rm -it -v $(pwd)/data:/app/data -v $(pwd)/results:/app/results spline-enhancement
+```
+
+✅ This automatically runs `main.py` inside the container.
+
+---
+
+### Option 2: Using Conda (Alternative)
 
 1. Run the setup script:
 
@@ -61,17 +71,6 @@ conda activate spline-interpolation-enhancement
 brew install ffmpeg      # For Mac
 sudo apt install ffmpeg  # For Linux
 ```
-
----
-
-### Option 2: Using Docker
-
-```bash
-docker build -t spline-enhancement .
-docker run --rm -it -v $(pwd)/data:/app/data -v $(pwd)/results:/app/results spline-enhancement
-```
-
-✅ This automatically runs `main.py` inside the container.
 
 ---
 
@@ -107,6 +106,7 @@ python main.py
 - Place your original degraded video as `data/input/original_video.mp4` before running.
 - Outputs are auto-saved into `data/output/` and `results/`.
 - Large files are excluded from GitHub by `.gitignore`.
+- **Note:** In this project, the original video was not low-quality. Therefore, a `degrade.py` script was used to artificially downgrade a normal video (by reducing frame rate and audio quality). You can use `degrade.py` similarly on any video to create degraded input for testing purposes.
 
 ---
 
