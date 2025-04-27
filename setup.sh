@@ -1,10 +1,14 @@
 #!/bin/bash
 
-echo "Creating virtual environment..."
-python3 -m venv venv
-source venv/bin/activate
+echo "Creating Conda environment from environment.yml..."
 
-echo "Installing dependencies..."
-pip install -r requirements.txt
+# Create environment
+conda env create -f environment.yml
+
+echo "Environment created!"
+
+# Activate environment (cannot activate inside script easily)
+echo "To activate the environment, run:"
+echo "  conda activate spline-interpolation-enhancement"
 
 echo "Setup completed!"

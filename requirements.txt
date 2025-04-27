@@ -1,8 +1,10 @@
-opencv-python
 numpy
 scipy
-librosa
-soundfile
-moviepy
-scikit-image
 scikit-learn
+scikit-image
+opencv-python
+matplotlib
+tqdm
+moviepy
+librosa
+pysoundfile

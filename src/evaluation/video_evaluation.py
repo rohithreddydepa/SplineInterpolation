@@ -1,78 +1,115 @@
 import numpy as np
 import cv2
 import os
+import json
 import matplotlib.pyplot as plt
-from skimage.metrics import structural_similarity
+from skimage.metrics import structural_similarity, peak_signal_noise_ratio
+from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor
 
-def evaluate_video(original_frames, interpolated_frames, interpolation_factor, output_folder="results/video_charts"):
-    # Ensure the output folder exists
+def evaluate_video(original_frames, enhanced_frames, output_folder="results/video_charts",
+                   max_frames=100, parallel=True):
     os.makedirs(output_folder, exist_ok=True)
 
-    # ✅ Correctly initialize empty lists
-    ssim_list = []
-    psnr_list = []
+    assert len(original_frames) > 0 and len(enhanced_frames) > 0, "Empty frame list"
+    assert original_frames[0].shape == enhanced_frames[0].shape, "Frame dimension mismatch"
 
-    sampled_frames = interpolated_frames[::interpolation_factor]
+    n_frames = min(len(original_frames), len(enhanced_frames), max_frames)
+    orig_frames = original_frames[:n_frames]
+    enh_frames = enhanced_frames[:n_frames]
 
-    for idx, (orig, interp) in enumerate(zip(original_frames, sampled_frames)):
-        # Progress print
-        print(f"Evaluating frame {idx + 1}/{len(sampled_frames)}...")
+    metrics = {'ssim': [], 'psnr': [], 'mse': [], 'color_psnr': {'y': [], 'u': [], 'v': []}}
 
-        orig_gray = cv2.cvtColor(orig, cv2.COLOR_BGR2GRAY)
-        interp_gray = cv2.cvtColor(interp, cv2.COLOR_BGR2GRAY)
+    def process_frame_pair(args):
+        idx, orig, enh = args
+        orig_yuv = cv2.cvtColor(orig, cv2.COLOR_BGR2YUV)
+        enh_yuv = cv2.cvtColor(enh, cv2.COLOR_BGR2YUV)
 
-        # Calculate SSIM
-        ssim = structural_similarity(orig_gray, interp_gray)
+        frame_metrics = {
+            'ssim': structural_similarity(orig_yuv[..., 0], enh_yuv[..., 0], data_range=255, gaussian_weights=True),
+            'psnr': peak_signal_noise_ratio(orig, enh),
+            'color_psnr': {
+                'y': peak_signal_noise_ratio(orig_yuv[..., 0], enh_yuv[..., 0]),
+                'u': peak_signal_noise_ratio(orig_yuv[..., 1], enh_yuv[..., 1]),
+                'v': peak_signal_noise_ratio(orig_yuv[..., 2], enh_yuv[..., 2])
+            },
+            'mse': np.mean((orig.astype(np.float32) - enh.astype(np.float32)) ** 2)
+        }
 
-        # Manual PSNR calculation to avoid divide by zero
-        mse = np.mean((orig_gray.astype(np.float32) - interp_gray.astype(np.float32)) ** 2)
-        if mse == 0:
-            psnr = float('inf')  # PSNR is infinite if no error
-        else:
-            psnr = 10 * np.log10((255 ** 2) / mse)
+        if idx < 5:
+            fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+            axes[0].imshow(cv2.cvtColor(orig, cv2.COLOR_BGR2RGB))
+            axes[0].set_title(f'Original Frame {idx}')
+            axes[0].axis('off')
 
-        ssim_list.append(ssim)
-        psnr_list.append(psnr)
+            axes[1].imshow(cv2.cvtColor(enh, cv2.COLOR_BGR2RGB))
+            axes[1].set_title(f'Enhanced Frame {idx}')
+            axes[1].axis('off')
 
-    # Compute averages
-    avg_ssim = np.mean(ssim_list)
-    avg_psnr = np.mean([p if p != float('inf') else 100 for p in psnr_list])  # Treat infinite PSNR as 100 dB for averaging
+            diff = cv2.absdiff(orig, enh)
+            axes[2].imshow(diff)
+            axes[2].set_title('Difference Map')
+            axes[2].axis('off')
 
-    # 📈 Plot 1: SSIM over frames
-    plt.figure(figsize=(12, 6))
-    plt.plot(ssim_list, label='SSIM per Frame', color='blue')
-    plt.title('SSIM vs Frame Index')
-    plt.xlabel('Frame Index')
-    plt.ylabel('SSIM Value')
-    plt.ylim(0, 1)
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_folder, f"frame_comparison_{idx}.png"))
+            plt.close()
+
+        return frame_metrics
+
+    frame_args = [(i, o, e) for i, (o, e) in enumerate(zip(orig_frames, enh_frames))]
+
+    if parallel:
+        with ThreadPoolExecutor() as executor:
+            results = list(tqdm(executor.map(process_frame_pair, frame_args), total=n_frames, desc="Evaluating Frames"))
+    else:
+        results = [process_frame_pair(args) for args in tqdm(frame_args, desc="Evaluating Frames")]
+
+    for res in results:
+        metrics['ssim'].append(res['ssim'])
+        metrics['psnr'].append(res['psnr'])
+        metrics['mse'].append(res['mse'])
+        for c in ['y', 'u', 'v']:
+            metrics['color_psnr'][c].append(res['color_psnr'][c])
+
+    plt.figure(figsize=(14, 10))
+
+    plt.subplot(3, 1, 1)
+    plt.plot(metrics['ssim'], label='SSIM', color='blue')
+    plt.title('SSIM over Frames')
     plt.grid(True)
+
+    plt.subplot(3, 1, 2)
+    plt.plot(metrics['psnr'], label='PSNR', color='green')
+    plt.title('PSNR over Frames')
+    plt.grid(True)
+
+    plt.subplot(3, 1, 3)
+    for c, color in zip(['y', 'u', 'v'], ['gold', 'magenta', 'cyan']):
+        plt.plot(metrics['color_psnr'][c], label=f'{c.upper()} PSNR', color=color)
+    plt.title('Color Channels PSNR')
     plt.legend()
+    plt.grid(True)
+
     plt.tight_layout()
-    ssim_plot_path = os.path.join(output_folder, "ssim_per_frame.png")
-    plt.savefig(ssim_plot_path)
+    plt.savefig(os.path.join(output_folder, "video_quality_timeseries.png"))
     plt.close()
 
-    # 📈 Plot 2: PSNR over frames
-    plt.figure(figsize=(12, 6))
-    plt.plot(psnr_list, label='PSNR per Frame (dB)', color='green')
-    plt.title('PSNR vs Frame Index')
-    plt.xlabel('Frame Index')
-    plt.ylabel('PSNR (dB)')
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    psnr_plot_path = os.path.join(output_folder, "psnr_per_frame.png")
-    plt.savefig(psnr_plot_path)
-    plt.close()
+    summary = {
+        'mean_ssim': np.mean(metrics['ssim']),
+        'mean_psnr': np.mean(metrics['psnr']),
+        'mean_mse': np.mean(metrics['mse']),
+        'mean_color_psnr': {c: np.mean(metrics['color_psnr'][c]) for c in ['y', 'u', 'v']}
+    }
 
-    # 📄 Save detailed CSV
-    csv_path = os.path.join(output_folder, "video_metrics_per_frame.csv")
-    with open(csv_path, 'w') as f:
-        f.write("Frame,SSIM,PSNR\n")
-        for i, (s, p) in enumerate(zip(ssim_list, psnr_list)):
-            p_val = p if p != float('inf') else 100.00  # Save 100 for infinite PSNR frames
-            f.write(f"{i},{s:.6f},{p_val:.2f}\n")
+    # Safe JSON dump (convert numpy types)
+    def convert_numpy(obj):
+        if isinstance(obj, (np.float32, np.float64, np.int32, np.int64)):
+            return obj.item()
+        raise TypeError(f"Type {type(obj)} not serializable")
 
-    print(f"✅ Video evaluation plots and CSV saved to {output_folder}/")
+    with open(os.path.join(output_folder, "video_metrics.json"), 'w') as f:
+        json.dump({**metrics, **summary}, f, indent=2, default=convert_numpy)
 
-    return avg_ssim, avg_psnr
+    print(f" Video evaluation completed. Results saved to {output_folder}")
+    return {**metrics, **summary}
